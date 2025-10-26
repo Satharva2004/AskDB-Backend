@@ -1,18 +1,19 @@
 const mysql = require('mysql2/promise');
+const { db: dbConfig } = require('../config/env');
 
 let pool;
 
 function getPool() {
   if (!pool) {
     pool = mysql.createPool({
-      host: process.env.MYSQL_HOST || 'localhost',
-      user: process.env.MYSQL_USER || 'root',
-      password: process.env.MYSQL_PASSWORD || '',
-      database: process.env.MYSQL_DATABASE || 'askdb',
-      port: Number(process.env.MYSQL_PORT || 3306),
+      host: dbConfig.host,
+      user: dbConfig.user,
+      password: dbConfig.password,
+      database: dbConfig.database,
+      port: dbConfig.port,
       waitForConnections: true,
-      connectionLimit: Number(process.env.MYSQL_CONNECTION_LIMIT || 10),
-      queueLimit: Number(process.env.MYSQL_QUEUE_LIMIT || 0),
+      connectionLimit: dbConfig.connectionLimit,
+      queueLimit: dbConfig.queueLimit,
     });
   }
 
