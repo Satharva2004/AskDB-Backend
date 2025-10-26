@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { query } = require('./db_helper');
+const { query } = require('../config/db');
 
 const USER_FIELDS = ['id', 'email', 'password_hash', 'full_name', 'created_at', 'updated_at'];
 
