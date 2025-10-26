@@ -1,31 +1,30 @@
-import { openai } from "../config/openai";
+const { chat } = require('../config/openai');
 
-export async function generateQuery(prompt) {
-    try {
-        const response = await openai.createCompletion({
-            model: "gpt-3.5-turbo",
-            prompt: prompt,
-            max_tokens: 100,
-            temperature: 0.1,
-        });
-        return response.data.choices[0].text.trim();
-    } catch (error) {
-        console.error("Error generating query:", error);
-        throw error;
-    }
+async function generateQuery(prompt) {
+  try {
+    const content = await chat([
+      { role: 'system', content: 'You are a SQL query generator. Only output a single MySQL SELECT statement. No backticks, no markdown, no explanations.' },
+      { role: 'user', content: prompt },
+    ], { model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo', temperature: 0.1, max_tokens: 300 });
+    return (content || '').trim();
+  } catch (error) {
+    console.error('Error generating query:', error);
+    throw error;
+  }
 }
 
-export async function geminiQuery(prompt) {
-    try {
-        const response = await openai.createCompletion({
-            model: "gemini-1.5-flash",
-            prompt: prompt,
-            max_tokens: 100,
-            temperature: 0.1,
-        });
-        return response.data.choices[0].text.trim();
-    } catch (error) {
-        console.error("Error generating query:", error);
-        throw error;
-    }
+async function summarizeAnswer(question, rows) {
+  try {
+    const preview = Array.isArray(rows) ? rows.slice(0, 50) : rows; // limit size
+    const content = await chat([
+      { role: 'system', content: 'You answer questions using provided SQL result rows. Be concise and accurate. If data is empty, say so.' },
+      { role: 'user', content: `Question: ${question}\nRows (JSON array):\n${JSON.stringify(preview)}` },
+    ], { model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo', temperature: 0.2, max_tokens: 300 });
+    return (content || '').trim();
+  } catch (error) {
+    console.error('Error summarizing answer:', error);
+    throw error;
+  }
 }
+
+module.exports = { generateQuery, summarizeAnswer };

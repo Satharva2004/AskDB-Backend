@@ -141,3 +141,77 @@ async function persistSchemaSnapshot(connectionId, schema) {
 }
 
 module.exports = { createConnection };
+
+// --- New helpers for executing SQL on a saved connection ---
+async function getConnectionDetails(connectionId) {
+  const rows = await query('SELECT * FROM connections WHERE id = ?', [connectionId]);
+  const conn = rows && rows[0];
+  if (!conn) {
+    const e = new Error('Connection not found');
+    e.code = 'CONNECTION_NOT_FOUND';
+    e.statusCode = 404;
+    throw e;
+  }
+  return conn;
+}
+
+async function getSchemaSnapshot(connectionId) {
+  const tables = await query(
+    'SELECT id, table_name FROM connection_schema_tables WHERE connection_id = ? ORDER BY table_name',
+    [connectionId]
+  );
+  const schema = {};
+  for (const t of tables) {
+    const cols = await query(
+      'SELECT column_name, data_type, is_nullable FROM connection_schema_columns WHERE table_id = ? ORDER BY id',
+      [t.id]
+    );
+    schema[t.table_name] = cols;
+  }
+  return schema;
+}
+
+function assertSelectOnly(sql) {
+  if (typeof sql !== 'string') {
+    const e = new Error('SQL must be a string');
+    e.code = 'INVALID_SQL_TYPE';
+    throw e;
+  }
+  const trimmed = sql.trim();
+  const isSelect = /^select\b/i.test(trimmed);
+  const forbidden = /(insert|update|delete|drop|alter|truncate|create|grant|revoke)\b/i.test(trimmed);
+  if (!isSelect || forbidden) {
+    const e = new Error('Only SELECT queries are allowed');
+    e.code = 'SQL_NOT_ALLOWED';
+    e.statusCode = 400;
+    throw e;
+  }
+}
+
+async function executeSqlOnConnection(connectionId, sql) {
+  assertSelectOnly(sql);
+  const connInfo = await getConnectionDetails(connectionId);
+  if ((connInfo.db_type || '').toLowerCase() !== 'mysql') {
+    const e = new Error('Only mysql connections are supported');
+    e.code = 'UNSUPPORTED_DB_TYPE';
+    throw e;
+  }
+  let conn;
+  try {
+    conn = await mysql.createConnection({
+      host: connInfo.host,
+      port: Number(connInfo.port),
+      user: connInfo.user,
+      password: connInfo.password,
+      database: connInfo.database,
+    });
+    const [rows] = await conn.query(sql);
+    return rows;
+  } finally {
+    if (conn) await conn.end();
+  }
+}
+
+module.exports.getConnectionDetails = getConnectionDetails;
+module.exports.executeSqlOnConnection = executeSqlOnConnection;
+module.exports.getSchemaSnapshot = getSchemaSnapshot;
