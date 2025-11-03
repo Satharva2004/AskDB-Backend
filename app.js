@@ -3,9 +3,11 @@ const userRoutes = require('./src/routes/user');
 const { query } = require('./src/config/db');
 const connectionRoutes = require('./src/routes/connections');
 const aiRoutes = require('./src/routes/ai');
+const cors = require('cors');
 const app = express();
 
 app.use(express.json());
+app.use(cors({ origin: 'http://localhost:8080' }));
 
 app.get('/', (req, res) => {
   res.json({ status: 'ok' });
@@ -27,5 +29,6 @@ app.use((err, req, res, next) => {
 
   res.status(status).json(body);
 });
+
 
 module.exports = app;

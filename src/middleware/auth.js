@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { jwt: jwtConfig } = require('../config/env');
 const { getUserById } = require('../helper/user');
+const { createConnection } = require('../helper/connections');
 
 async function auth(req, res, next) {
   try {
