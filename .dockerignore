@@ -1,0 +1,7 @@
+node_modules
+npm-debug.log
+Dockerfile
+.git
+.gitignore
+# Remove .env from dockerignore so it gets copied to container
+# .env

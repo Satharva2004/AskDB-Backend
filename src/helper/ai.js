@@ -19,7 +19,7 @@ async function summarizeAnswer(question, rows, { provider = process.env.LLM_PROV
     const content = await chat(provider, [
       { role: 'system', content: 'You answer questions using provided SQL result rows. Be concise and accurate. If data is empty, say so.' },
       { role: 'user', content: `Question: ${question}\nRows (JSON array):\n${JSON.stringify(preview)}` },
-    ], { model, temperature: 0.2, max_tokens: 300 });
+    ], { model, temperature: 0.7, max_tokens: 1080 });
     return (content || '').trim();
   } catch (error) {
     console.error('Error summarizing answer:', error);

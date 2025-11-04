@@ -13,7 +13,7 @@ try {
 
 const config = {
   app: {
-    port: Number(process.env.PORT),
+    port: Number(process.env.PORT) || 6969,
     env: process.env.NODE_ENV,
   },
   db: {

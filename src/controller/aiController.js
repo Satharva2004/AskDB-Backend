@@ -33,7 +33,6 @@ async function askDbController(req, res, next) {
       dbName = conn && conn.database ? String(conn.database) : '';
     } catch (_) {}
 
-    // Ask LLM to generate a SQL query (SELECT only)
     const rawSql = await generateQuery(
       `Rules:
 1) Output exactly ONE MySQL SELECT statement.
