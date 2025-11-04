@@ -86,14 +86,34 @@ async function createConnection({ db_type, host, port, user, password, database,
     await ensureSchemaSnapshotTables();
     await persistSchemaSnapshot(result.insertId, schema);
 
-    const safe = { ...created };
-    if ('password' in safe) safe.password = '********';
+    const safe = sanitizeConnection(created);
     safe.schema = schema;
     return safe;
   } catch (error) {
     if (!error.code) error.code = 'CONNECTION_CREATE_FAILED';
     throw error;
   }
+}
+
+function sanitizeConnection(row) {
+  const safe = { ...row };
+  if ('password' in safe) {
+    safe.password = '********';
+  }
+  return safe;
+}
+
+async function listConnectionsForUser(userId) {
+  const normalizedId = Number(userId);
+  if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+    const err = new Error('Valid user id is required');
+    err.code = 'INVALID_USER_ID';
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const rows = await query('SELECT * FROM connections WHERE user_id = ? ORDER BY updated_at DESC, id DESC', [normalizedId]);
+  return rows.map((row) => sanitizeConnection(row));
 }
 
 async function ensureSchemaSnapshotTables() {
@@ -141,6 +161,7 @@ async function persistSchemaSnapshot(connectionId, schema) {
 }
 
 module.exports = { createConnection };
+module.exports.listConnectionsForUser = listConnectionsForUser;
 
 // --- New helpers for executing SQL on a saved connection ---
 async function getConnectionDetails(connectionId) {

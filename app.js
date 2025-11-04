@@ -7,7 +7,9 @@ const cors = require('cors');
 const app = express();
 
 app.use(express.json());
-app.use(cors({ origin: 'http://localhost:8080' }));
+app.use(cors({ origin: 'http://localhost:8080',
+  origin: 'https://lovable.dev/projects/cc0a0a79-f112-4814-8c3f-f9233f3a3547',
+}));
 
 app.get('/', (req, res) => {
   res.json({ status: 'ok' });
