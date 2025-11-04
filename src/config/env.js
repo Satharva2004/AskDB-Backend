@@ -11,10 +11,24 @@ try {
   // dotenv may not be installed yet; continue with process.env
 }
 
+const parseCsv = (value) => {
+  if (!value || typeof value !== 'string') {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
 const config = {
   app: {
     port: Number(process.env.PORT) || 6969,
     env: process.env.NODE_ENV,
+  },
+  cors: {
+    allowedOrigins: parseCsv(process.env.CORS_ALLOWED_ORIGINS),
   },
   db: {
     host: process.env.DB_HOST || process.env.MYSQL_HOST,
