@@ -8,7 +8,7 @@ const app = express();
 
 app.use(express.json());
 app.use(cors({ origin: 'http://localhost:8080',
-  origin: 'https://lovable.dev/projects/cc0a0a79-f112-4814-8c3f-f9233f3a3547',
+  origin: 'https://ask-aura.vercel.app',
 }));
 
 app.get('/', (req, res) => {
