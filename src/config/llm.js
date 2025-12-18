@@ -31,7 +31,7 @@ function requestJson({ host, path, method = 'POST', headers = {}, bodyObj }) {
   });
 }
 
-async function chatGemini(messages, { model = process.env.GEMINI_MODEL || 'gemini-1.5-flash-latest', temperature = 0.2, max_tokens = 300 } = {}) {
+async function chatGemini(messages, { model = process.env.GEMINI_MODEL || 'gemini-2.5-flash', temperature = 0.2, max_tokens = 300 } = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
   const host = process.env.GEMINI_BASE_HOST || 'generativelanguage.googleapis.com';
   if (!apiKey) {
@@ -52,7 +52,9 @@ async function chatGemini(messages, { model = process.env.GEMINI_MODEL || 'gemin
   for (const m of messages) {
     if (m.role !== currentRole) {
       flush();
-      currentRole = m.role === 'system' ? 'user' : m.role; // Gemini doesn't support system; fold into user
+      if (m.role === 'system') currentRole = 'user';
+      else if (m.role === 'assistant') currentRole = 'model';
+      else currentRole = m.role;
       currentParts = [];
     }
     currentParts.push(String(m.content || ''));

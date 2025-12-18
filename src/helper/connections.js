@@ -1,5 +1,6 @@
 const { query } = require('../config/db');
 const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 
 function validateString(name, value) {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -20,32 +21,79 @@ function validatePort(port) {
   return n;
 }
 
-async function testConnectionAndFetchSchema({ host, port, user, password, database }) {
-  let conn;
-  try {
-    conn = await mysql.createConnection({ host, port, user, password, database });
-    const [tables] = await conn.query(
-      `SELECT TABLE_NAME AS table_name
-       FROM information_schema.tables
-       WHERE table_schema = ?
-       ORDER BY TABLE_NAME`,
-      [database]
-    );
-    const schema = {};
-    for (const row of tables) {
-      const table = row.table_name;
-      const [cols] = await conn.query(
-        `SELECT COLUMN_NAME AS column_name, DATA_TYPE AS data_type, IS_NULLABLE AS is_nullable
-         FROM information_schema.columns
-         WHERE table_schema = ? AND table_name = ?
-         ORDER BY ORDINAL_POSITION`,
-        [database, table]
+async function testConnectionAndFetchSchema({ host, port, user, password, database, db_type }) {
+  if (db_type === 'mysql') {
+    let conn;
+    try {
+      conn = await mysql.createConnection({
+        host,
+        port,
+        user,
+        password,
+        database,
+        connectTimeout: 30000, // 30 seconds
+        timeout: 60000 // 60 seconds for queries
+      });
+      const [tables] = await conn.query(
+        `SELECT TABLE_NAME AS table_name
+         FROM information_schema.tables
+         WHERE table_schema = ?
+         ORDER BY TABLE_NAME`,
+        [database]
       );
-      schema[table] = cols;
+      const schema = {};
+      for (const row of tables) {
+        const table = row.table_name;
+        const [cols] = await conn.query(
+          `SELECT COLUMN_NAME AS column_name, DATA_TYPE AS data_type, IS_NULLABLE AS is_nullable
+           FROM information_schema.columns
+           WHERE table_schema = ? AND table_name = ?
+           ORDER BY ORDINAL_POSITION`,
+          [database, table]
+        );
+        schema[table] = cols;
+      }
+      return schema;
+    } finally {
+      if (conn) await conn.end();
     }
-    return schema;
-  } finally {
-    if (conn) await conn.end();
+  } else if (db_type === 'postgresql') {
+    const pool = new Pool({
+      host,
+      port,
+      user,
+      password,
+      database,
+      connectionTimeoutMillis: 30000, // 30 seconds
+      query_timeout: 60000, // 60 seconds for queries
+      statement_timeout: 60000, // 60 seconds statement timeout
+      ssl: {
+        rejectUnauthorized: false // Accept self-signed certificates (AWS RDS)
+      }
+    });
+    try {
+      const tablesResult = await pool.query(
+        `SELECT table_name
+         FROM information_schema.tables
+         WHERE table_schema = 'public'
+         ORDER BY table_name`
+      );
+      const schema = {};
+      for (const row of tablesResult.rows) {
+        const table = row.table_name;
+        const colsResult = await pool.query(
+          `SELECT column_name, data_type, is_nullable
+           FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = $1
+           ORDER BY ordinal_position`,
+          [table]
+        );
+        schema[table] = colsResult.rows;
+      }
+      return schema;
+    } finally {
+      await pool.end();
+    }
   }
 }
 
@@ -60,9 +108,28 @@ async function createConnection({ db_type, host, port, user, password, database,
     user_id: user_id == null ? null : Number(user_id),
   };
 
-  if (normalized.db_type !== 'mysql') {
-    const e = new Error('Only mysql db_type is supported for now');
+  const supportedTypes = ['mysql', 'postgresql', 'postgres'];
+  if (!supportedTypes.includes(normalized.db_type)) {
+    const e = new Error('Only mysql and postgresql db_types are supported');
     e.code = 'UNSUPPORTED_DB_TYPE';
+    throw e;
+  }
+
+  // Normalize postgres to postgresql
+  if (normalized.db_type === 'postgres') {
+    normalized.db_type = 'postgresql';
+  }
+
+  // Warn about common port mismatches
+  if (normalized.db_type === 'mysql' && normalized.port === 5432) {
+    const e = new Error('Port 5432 is typically used for PostgreSQL, not MySQL. Did you mean to use db_type: "postgresql"? MySQL typically uses port 3306.');
+    e.code = 'POSSIBLE_WRONG_DB_TYPE';
+    throw e;
+  }
+
+  if (normalized.db_type === 'postgresql' && normalized.port === 3306) {
+    const e = new Error('Port 3306 is typically used for MySQL, not PostgreSQL. Did you mean to use db_type: "mysql"? PostgreSQL typically uses port 5432.');
+    e.code = 'POSSIBLE_WRONG_DB_TYPE';
     throw e;
   }
 
@@ -212,24 +279,49 @@ function assertSelectOnly(sql) {
 async function executeSqlOnConnection(connectionId, sql) {
   assertSelectOnly(sql);
   const connInfo = await getConnectionDetails(connectionId);
-  if ((connInfo.db_type || '').toLowerCase() !== 'mysql') {
-    const e = new Error('Only mysql connections are supported');
-    e.code = 'UNSUPPORTED_DB_TYPE';
-    throw e;
-  }
-  let conn;
-  try {
-    conn = await mysql.createConnection({
+  const dbType = (connInfo.db_type || '').toLowerCase();
+
+  if (dbType === 'mysql') {
+    let conn;
+    try {
+      conn = await mysql.createConnection({
+        host: connInfo.host,
+        port: Number(connInfo.port),
+        user: connInfo.user,
+        password: connInfo.password,
+        database: connInfo.database,
+        connectTimeout: 30000, // 30 seconds
+        timeout: 60000 // 60 seconds for queries
+      });
+      const [rows] = await conn.query(sql);
+      return rows;
+    } finally {
+      if (conn) await conn.end();
+    }
+  } else if (dbType === 'postgresql') {
+    const pool = new Pool({
       host: connInfo.host,
       port: Number(connInfo.port),
       user: connInfo.user,
       password: connInfo.password,
       database: connInfo.database,
+      connectionTimeoutMillis: 30000, // 30 seconds
+      query_timeout: 60000, // 60 seconds for queries
+      statement_timeout: 60000, // 60 seconds statement timeout
+      ssl: {
+        rejectUnauthorized: false // Accept self-signed certificates (AWS RDS)
+      }
     });
-    const [rows] = await conn.query(sql);
-    return rows;
-  } finally {
-    if (conn) await conn.end();
+    try {
+      const result = await pool.query(sql);
+      return result.rows;
+    } finally {
+      await pool.end();
+    }
+  } else {
+    const e = new Error('Only mysql and postgresql connections are supported');
+    e.code = 'UNSUPPORTED_DB_TYPE';
+    throw e;
   }
 }
 
