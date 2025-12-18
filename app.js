@@ -4,43 +4,18 @@ const { query } = require('./src/config/db');
 const connectionRoutes = require('./src/routes/connections');
 const aiRoutes = require('./src/routes/ai');
 const cors = require('cors');
-const config = require('./src/config/env');
-
 const app = express();
 
 app.use(express.json());
 
-const defaultAllowedOrigins = [
+const allowedOrigins = [
   'http://localhost:8080',
-  'http://localhost:5173',
   'https://ask-aura.vercel.app',
-];
-
-const normalizeOrigin = (origin) => {
-  if (!origin) return origin;
-  return origin.trim().replace(/\/$/, '').toLowerCase();
-};
-
-const configuredOrigins = Array.isArray(config?.cors?.allowedOrigins)
-  ? config.cors.allowedOrigins
-  : [];
-
-const mergedOrigins = [...defaultAllowedOrigins, ...configuredOrigins]
-  .map(normalizeOrigin)
-  .filter(Boolean);
-
-const allowAllOrigins = mergedOrigins.includes('*');
-const allowedOrigins = new Set(mergedOrigins);
+].filter(Boolean);
 
 app.use(cors({
   origin(origin, callback) {
-    if (allowAllOrigins) {
-      return callback(null, true);
-    }
-
-    const normalizedOrigin = normalizeOrigin(origin);
-
-    if (!origin || allowedOrigins.has(normalizedOrigin)) {
+    if (!origin || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
@@ -53,10 +28,9 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Health check endpoint with environment validation
 app.get('/health', (req, res) => {
-  const { app: appConfig, db: dbConfig, jwt: jwtConfig, meta } = config;
-
+  const { app: appConfig, db: dbConfig, jwt: jwtConfig, meta } = require('./src/config/env');
+  
   const health = {
     status: 'healthy',
     timestamp: new Date().toISOString(),

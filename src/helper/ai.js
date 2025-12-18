@@ -1,6 +1,6 @@
 const { chat } = require('../config/llm');
 
-async function generateQuery(prompt, { provider = process.env.LLM_PROVIDER || 'openai', model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo' } = {}) {
+async function generateQuery(prompt, { provider = 'gemini', model = 'gemini-2.0-flash-exp' } = {}) {
   try {
     const content = await chat(provider, [
       { role: 'system', content: 'You are a SQL query generator. Only output a single MySQL SELECT statement. No backticks, no markdown, no explanations.' },
@@ -13,7 +13,7 @@ async function generateQuery(prompt, { provider = process.env.LLM_PROVIDER || 'o
   }
 }
 
-async function summarizeAnswer(question, rows, { provider = process.env.LLM_PROVIDER || 'openai', model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo' } = {}) {
+async function summarizeAnswer(question, rows, { provider = 'gemini', model = 'gemini-2.0-flash-exp' } = {}) {
   try {
     const preview = Array.isArray(rows) ? rows.slice(0, 50) : rows; // limit size
     const content = await chat(provider, [

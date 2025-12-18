@@ -1,5 +1,4 @@
 const https = require('https');
-const { chat: chatOpenAI } = require('./openai');
 
 function requestJson({ host, path, method = 'POST', headers = {}, bodyObj }) {
   const payload = bodyObj ? JSON.stringify(bodyObj) : undefined;
@@ -30,23 +29,6 @@ function requestJson({ host, path, method = 'POST', headers = {}, bodyObj }) {
     if (payload) req.write(payload);
     req.end();
   });
-}
-
-async function chatGroq(messages, { model = process.env.GROQ_MODEL || 'llama-3.1-70b-versatile', temperature = 0.2, max_tokens = 300 } = {}) {
-  const apiKey = process.env.GROQ_API_KEY;
-  const host = process.env.GROQ_BASE_URL || 'api.groq.com';
-  if (!apiKey) {
-    const e = new Error('Missing GROQ_API_KEY');
-    e.code = 'GROQ_API_KEY_MISSING';
-    throw e;
-  }
-  const json = await requestJson({
-    host,
-    path: '/openai/v1/chat/completions',
-    headers: { Authorization: `Bearer ${apiKey}` },
-    bodyObj: { model, messages, temperature, max_tokens },
-  });
-  return json.choices?.[0]?.message?.content || '';
 }
 
 async function chatGemini(messages, { model = process.env.GEMINI_MODEL || 'gemini-1.5-flash-latest', temperature = 0.2, max_tokens = 300 } = {}) {
@@ -98,14 +80,8 @@ async function chatGemini(messages, { model = process.env.GEMINI_MODEL || 'gemin
 }
 
 async function chat(provider, messages, options) {
-  const p = (provider || 'openai').toLowerCase();
-  if (p === 'openai') return chatOpenAI(messages, options);
-  if (p === 'groq') return chatGroq(messages, options);
-  if (p === 'gemini') return chatGemini(messages, options);
-  const e = new Error(`Unknown LLM provider: ${provider}`);
-  e.code = 'UNKNOWN_LLM_PROVIDER';
-  e.statusCode = 400;
-  throw e;
+  // Always default to Gemini regardless of the provider string
+  return chatGemini(messages, options);
 }
 
-module.exports = { chat, chatOpenAI, chatGroq, chatGemini };
+module.exports = { chat, chatGemini };
