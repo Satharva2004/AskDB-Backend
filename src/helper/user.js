@@ -98,7 +98,7 @@ async function createUser({ email, password, fullName }) {
     );
 
     const [createdUser] = await query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-    
+
     return mapDbUser(createdUser);
   } catch (error) {
     if (!error.code) {
@@ -156,8 +156,22 @@ async function authenticateUser({ email, password }) {
   }
 }
 
+async function findUserByEmail(email) {
+  const normalizedEmail = validateEmail(email);
+  try {
+    const rows = await query('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
+    if (rows.length === 0) {
+      return null;
+    }
+    return mapDbUser(rows[0]);
+  } catch (error) {
+    throw error;
+  }
+}
+
 module.exports = {
   createUser,
   authenticateUser,
   getUserById,
+  findUserByEmail,
 };

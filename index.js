@@ -1,5 +1,5 @@
-const app = require('./app');
 const { app: appConfig } = require('./src/config/env');
+const app = require('./app');
 
 const PORT = appConfig.port;
 
